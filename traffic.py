@@ -7,6 +7,14 @@ import matplotlib.pyplot as plt
 from sklearn.model_selection import train_test_split
 
 
+EPOCHS = 10
+BATCH = 128
+IMG_WIDTH = 30
+IMG_HEIGHT = 30
+IMG_CHANNEL = 3
+NUM_CATEGORIES = 43
+TEST_SIZE = 0.4
+
 
 def main():
     # Check command-line arguments
@@ -17,7 +25,7 @@ def main():
     images, labels = load_data(sys.argv[1])
 
     # Split data into training and testing sets
-    labels = tf.keras.utils.to_categorical(labels)
+    labels = tf.keras.utils.to_categorical(labels, num_classes=NUM_CATEGORIES)
     x_train, x_test, y_train, y_test = train_test_split(
         np.array(images), np.array(labels), test_size=TEST_SIZE
     )
@@ -25,8 +33,30 @@ def main():
     # Get a compiled neural network
     model = get_model()
 
+    cb = None
+    """
+    # Uncomment for using callbacks.
+    # Create a folder to save model checkpoints.
+    if not os.path.exists("models"):
+        os.makedirs("models")
+
+    model_filepath = os.path.join("models", "model.{epoch:02d}-{val_loss:.4f}.h5")
+    cb = [
+        # tf.keras.callbacks.EarlyStopping(patience=EPOCHS//3),
+        tf.keras.callbacks.ModelCheckpoint(filepath=model_filepath,
+                                           save_best_only=True),
+        tf.keras.callbacks.TensorBoard(log_dir="logs")
+    ]
+    """
     # Fit model on training data
-    model.fit(x_train, y_train, epochs=EPOCHS)
+    history = model.fit(x_train, y_train,
+                        validation_data=(x_test, y_test),
+                        batch_size=BATCH,
+                        epochs=EPOCHS,
+                        callbacks=cb,
+                        verbose=1,
+                        use_multiprocessing=True,
+                        workers=-1)
 
     # Evaluate neural network performance
     model.evaluate(x_test, y_test, verbose=2)
@@ -36,6 +66,8 @@ def main():
         filename = sys.argv[2]
         model.save(filename)
         print(f"Model saved to {filename}.")
+
+    return history
 
 
 def load_data(data_dir):
@@ -52,7 +84,17 @@ def load_data(data_dir):
     be a list of integer labels, representing the categories for each of the
     corresponding `images`.
     """
+    images = []
+    labels = []
 
+    for root, dirs, files in os.walk("gtsrb"):
+        for file in files:
+            if not file.endswith(".ppm"):
+                continue
+            img = cv2.imread(os.path.join(root, file), 1)
+            img = cv2.resize(img, dsize=(30, 30))
+            images.append(img / 255.)
+            labels.append(os.path.basename(root))
 
     return images, labels
 
@@ -64,7 +106,25 @@ def get_model():
     The output layer should have `NUM_CATEGORIES` units, one for each category.
     """
 
+    layers = [
+        tf.keras.layers.Input(shape=(IMG_HEIGHT, IMG_WIDTH, IMG_CHANNEL)),
 
+        tf.keras.layers.Conv2D(256, (3, 3), activation="relu"),
+        tf.keras.layers.Dropout(0.5),
+
+        tf.keras.layers.Conv2D(128, (3, 3), activation="relu"),
+        tf.keras.layers.Dropout(0.5),
+
+        tf.keras.layers.Conv2D(64, (3, 3), activation="relu"),
+        tf.keras.layers.Dropout(0.5),
+
+        tf.keras.layers.Flatten(),
+        tf.keras.layers.Dense(164, activation="relu"),
+        tf.keras.layers.Dense(NUM_CATEGORIES, activation="softmax"),
+    ]
+    model = tf.keras.models.Sequential(layers=layers)
+    model.compile(optimizer="Adam", loss="categorical_crossentropy", metrics=["acc"])
+    model.summary()
     return model
 
 
