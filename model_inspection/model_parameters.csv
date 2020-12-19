@@ -1,0 +1,4 @@
+Model No, Total Number of Parameters, Second per Epoch, Best val_loss, Best val_loss's Epoch Number
+1, 39.260.587, 18, 0.0915, 7
+2, 10.932.139, 16, 0.0858, 42
+3, 6.428.955, 7, 0.0530, 9
