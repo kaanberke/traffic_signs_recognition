@@ -87,7 +87,7 @@ def load_data(data_dir):
     images = []
     labels = []
 
-    for root, dirs, files in os.walk("gtsrb"):
+    for root, dirs, files in os.walk(data_dir):
         for file in files:
             if not file.endswith(".ppm"):
                 continue
